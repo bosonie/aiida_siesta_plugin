@@ -372,6 +372,7 @@ class EqOfStateGeTe(WorkChain):
         self.ctx.angnow = okangle
         self.report('The angle {0} is the favourable for volume {1}'.format(okangle, self.ctx.volnow))
         calcs = {}
+        self.ctx.stresscoll = []
         for thex in self.ctx.atompos:
             inputs = AttributeDict(self.exposed_inputs(SiestaBaseWorkChain))
             inputs["structure"] = create_structure(Float(self.ctx.volnow), Float(self.ctx.angnow), Float(thex))
