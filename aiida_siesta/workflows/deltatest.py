@@ -2,7 +2,6 @@ import numpy as np
 from aiida import orm
 from aiida.engine import WorkChain, calcfunction, ToContext
 from aiida_siesta.workflows.eos import EqOfStateFixedCellShape
-from aiida_siesta.workflows.eos import SiestaBaseWorkChain
 
 
 def get_reference(element):
@@ -17,6 +16,7 @@ def get_reference(element):
             b0 = a[2]  #In GPa
             b1 = a[3]
     return float(vol), float(b0), float(b1)
+
 
 @calcfunction
 def calcDelta(v0wF, b0wF, b1wF, v0fF, b0fF, b1fF):
@@ -34,8 +34,8 @@ def calcDelta(v0wF, b0wF, b1wF, v0fF, b0fF, b1fF):
     #The reference bulk modulus is in GPa, need to convert back to eV/ang^3
     b0w = b0w * 10.**9. / 1.602176565e-19 / 10.**30.
 
-    vref = 30.
-    bref = 100. * 10.**9. / 1.602176565e-19 / 10.**30.
+    #vref = 30.
+    #bref = 100. * 10.**9. / 1.602176565e-19 / 10.**30.
 
     Vi = 0.94 * (v0w + v0f) / 2.
     Vf = 1.06 * (v0w + v0f) / 2.
@@ -84,9 +84,9 @@ def calcDelta(v0wF, b0wF, b1wF, v0fF, b0fF, b1fF):
         Gf = Gf + y[n] * Vf**(-(2. * n - 3.) / 3.)
 
     Delta = 1000. * np.sqrt((Ff - Fi) / (Vf - Vi))
-    Deltarel = 100. * np.sqrt((Ff - Fi) / (Gf - Gi))
-    Delta1 = 1000. * np.sqrt((Ff - Fi) / (Vf - Vi)) \
-        / (v0w + v0f) / (b0w + b0f) * 4. * vref * bref
+    #Deltarel = 100. * np.sqrt((Ff - Fi) / (Gf - Gi))
+    #Delta1 = 1000. * np.sqrt((Ff - Fi) / (Vf - Vi)) \
+    #    / (v0w + v0f) / (b0w + b0f) * 4. * vref * bref
 
     return orm.Float(Delta)  #, Deltarel, Delta1
 
@@ -174,22 +174,22 @@ def get_parameters(element):
     """
     parameters = {
         'mesh-cutoff': "500 Ry",
-        'max-scfiterations': 500,
-        'dm-numberpulay': 4,
-        'dm-mixingweight': 0.2,
-        'dm-tolerance': 1.e-5,
-        'Solution-method': 'diagon',
-        'electronic-temperature': '25 meV', #294 K, 0.00183747 Ry
+        'max-scf-iterations': 500,
+        'scf-mixer-history': 5,
+        'scf-mixer-weight': 0.1,
+        'scf-dm-tolerance': 1.e-5,
+        'electronic-temperature': '25 meV',  #294 K, 0.00183747 Ry
         'write-forces': True,
     }
     if element in ["O", "Cr", "Mn", "Fe", "Co", "Ni"]:
         parameters["spin"] = "polarized"
         if element in ["Fe", "Co", "Ni"]:
-            parameters["DM-InitSpin-AF"] = False
+            parameters["dm-init-spin-af"] = False
         elif element in ["Mn", "Cr"]:
-            parameters["DM-InitSpin-AF"] = True
+            parameters["write-mulliken-pop"] = 1
+            parameters["dm-init-spin-af"] = True
         else:
-            parameters["%block DM-InitSpin"] = "\n1 + \n2 + \n3 - \n4 - \n%endblock dmintspin"
+            parameters["%block dm-init-spin"] = "\n1 + \n2 + \n3 - \n4 - \n%endblock dmintspin"
 
     return orm.Dict(dict=parameters)
 
@@ -205,8 +205,8 @@ class DeltaWorkflow(WorkChain):
 
         spec.outline(cls.inpsetup, cls.run_eqs, cls.return_results)
 
-        spec.output('EosData', valid_type=orm.Dict,required=True)
-        spec.output('DeltaValue', valid_type=orm.Float,required=True)
+        spec.output('EosData', valid_type=orm.Dict, required=True)
+        spec.output('DeltaValue', valid_type=orm.Float, required=True)
 
         spec.exit_code(301, 'EOS_FIT_FAIL', message='Problem in the fit of the EoS data')
 
@@ -244,7 +244,7 @@ class DeltaWorkflow(WorkChain):
         Vref, Bref, B1ref = get_reference(self.inputs.element.value)
         outres = self.ctx.eos_calc.outputs.results_dict
         self.out('EosData', outres)
-        if not "fit_res" in outres.get_dict():
+        if "fit_res" not in outres.get_dict():
             self.report('EqOfStateFixedCellShape failed to perform Birch-Murnaghan fit')
             return self.exit_codes.EOS_FIT_FAIL
         fitres = outres.get_dict()["fit_res"]
@@ -252,6 +252,8 @@ class DeltaWorkflow(WorkChain):
         Bo = float(fitres['Bo(eV/ang^3)'])
         B1 = float(fitres['B1'])
         #delta = ret_delta(Vref, Bref, B1ref, Vo, Bo, B1)
-        delta2 = calcDelta(orm.Float(Vref), orm.Float(Bref), orm.Float(B1ref), orm.Float(Vo), orm.Float(Bo), orm.Float(B1))
+        delta2 = calcDelta(
+            orm.Float(Vref), orm.Float(Bref), orm.Float(B1ref), orm.Float(Vo), orm.Float(Bo), orm.Float(B1)
+        )
         self.out('DeltaValue', delta2)
         self.report('End of DeltaWorkflow for {}'.format(self.inputs.element.value))

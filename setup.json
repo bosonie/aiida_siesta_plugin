@@ -47,7 +47,8 @@
             "siesta.bands = aiida_siesta.workflows.bands:SiestaBandsWorkChain",
 	    "siesta.eos = aiida_siesta.workflows.eos:EqOfStateFixedCellShape",
 	    "siesta.bandgap = aiida_siesta.workflows.bandgap:BandgapWorkChain",
-            "siesta.stm = aiida_siesta.workflows.stm:SiestaSTMWorkChain"
+            "siesta.stm = aiida_siesta.workflows.stm:SiestaSTMWorkChain",
+	    "siesta.delta = aiida_siesta.workflows.deltatest:DeltaWorkflow"
         ],
         "aiida.data": [
             "siesta.psf = aiida_siesta.data.psf:PsfData",
