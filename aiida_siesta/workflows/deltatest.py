@@ -155,7 +155,7 @@ def get_basis(element):
     Basis set generator. Implement the exceptions due to problems with PseudoDojo pseudos.
     """
     basis_dict = {
-        'pao-energy-shift': '200 meV',
+        'pao-energy-shift': '100 meV',  #default is 0.02 Ry = 272 meV
         '%block pao-basis-sizes': "\n {} DZP\n%endblock pao-basis-sizes".format(element),
     }
 
@@ -173,6 +173,8 @@ def get_parameters(element):
     of the delta test.
     """
     parameters = {
+        'xc-functional': 'GGA',
+        'xc-authors': 'PBE',
         'mesh-cutoff': "500 Ry",
         'max-scf-iterations': 500,
         'scf-mixer-history': 5,

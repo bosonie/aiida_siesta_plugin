@@ -1,6 +1,6 @@
 from aiida import orm
 from aiida.engine import while_, submit, WorkChain, ToContext, calcfunction
-from aiida_siesta.workflows.DeltaTest import DeltaWorkflow
+from aiida_siesta.workflows.deltatest import DeltaWorkflow
 
 
 @calcfunction
@@ -37,7 +37,11 @@ class RunAllDelta(WorkChain):
         spec.output('DeltaValues', valid_type=orm.Dict, required=True)
 
     def inpsetup(self):
-        self.ctx.lista = ["Mn", "Fe"]
+        #lis = ["H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar","K","Ca","Sc","Ti","V","Cr","Mn","Fe"]
+        #lis = ["Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Kr","Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn"]
+        #lis = ["Sb","Te","I","Xe","Cs","Ba","Lu","Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg","Tl","Pb","Bi","Po","Rn"]
+
+        self.ctx.lista = lis
         self.ctx.counter = 0
         self.ctx.collection = {}
 
