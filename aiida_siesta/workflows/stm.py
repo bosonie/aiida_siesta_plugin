@@ -51,7 +51,7 @@ class SiestaSTMWorkChain(WorkChain):
         super(SiestaSTMWorkChain, cls).define(spec)
         spec.expose_inputs(SiestaBaseWorkChain, exclude=('metadata',))
         #Temporary fix to issue #135 plumpy
-        spec.inputs._ports['pseudos'].dynamic = True  #pylint: disable=protected-access
+        #spec.inputs._ports['pseudos'].dynamic = True  #pylint: disable=protected-access
         spec.input('emin', valid_type=Float, help='Lower boundary energy (in eV respect to Ef) for LDOS calculation')
         spec.input('emax', valid_type=Float, help='Higher boundary energy (in eV respect to Ef) for LDOS calculation')
         spec.input('stm_code', valid_type=Code, help='STM plstm code')
@@ -284,17 +284,18 @@ class SiestaSTMWorkChain(WorkChain):
 
         from aiida.engine import ExitCode
 
-        if not self.ctx.siesta_ldos.is_finished_ok:
-            return self.exit_codes.ERROR_STM_PLUGIN
-
         if self.ctx.spinstm == "non-collinear":
             cumarray = {}
             for spinmod in ("q", "x", "y", "z"):
                 stmnode = self.ctx[spinmod]
+                if not stmnode.is_finished_ok:
+                    return self.exit_codes.ERROR_STM_PLUGIN
                 cumarray[spinmod] = stmnode.outputs.stm_array
             stm_array = create_non_coll_array(**cumarray)
             self.out('stm_array', stm_array)
         else:
+            if not self.ctx.stm_calc.is_finished_ok:
+                return self.exit_codes.ERROR_STM_PLUGIN
             stm_plot_calc = self.ctx.stm_calc
             stm_array = stm_plot_calc.outputs.stm_array
             self.out('stm_array', stm_array)
@@ -306,3 +307,8 @@ class SiestaSTMWorkChain(WorkChain):
 
         self.report('STM workchain succesfully completed')
         return ExitCode(0)
+
+    @classmethod
+    def inputs_generator(cls):  # pylint: disable=no-self-argument,no-self-use
+        from aiida_siesta.workflows.utils.inputs_generators import StmWorkChainInputsGenerator
+        return StmWorkChainInputsGenerator(cls)

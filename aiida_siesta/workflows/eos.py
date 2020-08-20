@@ -216,7 +216,7 @@ class EqOfStateFixedCellShape(WorkChain):
             help="Volume per atom around which to perform the EqOfState"
         )
         spec.expose_inputs(SiestaBaseWorkChain, exclude=('metadata',))
-        spec.inputs._ports['pseudos'].dynamic = True  #Temporary fix to issue #135 plumpy
+        #spec.inputs._ports['pseudos'].dynamic = True  #Temporary fix to issue #135 plumpy
         spec.outline(cls.initio, cls.run_base_wcs, cls.return_results)
         spec.output(
             'results_dict',
@@ -264,6 +264,9 @@ class EqOfStateFixedCellShape(WorkChain):
         return ToContext(**calcs)  #Here it waits
 
     def return_results(self):
+
+        from aiida.engine import ExitCode
+
         self.report('All 7 calculations finished. Post process starts')
         collectwcinfo = {}
         for label in self.ctx.scales:
@@ -292,3 +295,10 @@ class EqOfStateFixedCellShape(WorkChain):
             self.report("WARNING: Birch-Murnaghan fit failed, check your results_dict['eos_data']")
 
         self.report('End of EqOfStateFixedCellShape Workchain')
+
+        return ExitCode(0)
+
+    @classmethod
+    def inputs_generator(cls):  # pylint: disable=no-self-argument,no-self-use
+        from aiida_siesta.workflows.utils.inputs_generators import EosWorkChainInputsGenerator
+        return EosWorkChainInputsGenerator(cls)
