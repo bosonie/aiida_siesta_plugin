@@ -139,61 +139,28 @@ def structure_init(element):
     return structure
 
 
-def kpgen(structure, distance):
+#
+#    if element in ["Li", "Be", "Mg", "Na", "Ga", "Ge", "As", "Se", "In"]:
+#        basis_dict['%block PAO-PolarizationScheme'] = "\n {} non-perturbative\n%endblock PaoPolarizationScheme".format(
+#            element
+#        )
+
+
+
+def fix_magnetic(element, param):
     """
-    K-points generator. I will implement also a copy from file way in the future.
+    Add the specific spin options to parameters dict
     """
-    kpoints_mesh = orm.KpointsData()
-    kpoints_mesh.set_cell_from_structure(structure)
-    kpoints_mesh.set_kpoints_mesh_from_density(distance=distance)
+    param["spin"] = "polarized"
+    if element in ["Fe", "Co", "Ni"]:
+       param["dm-init-spin-af"] = False
+    elif element in ["Mn", "Cr"]:
+       param["write-mulliken-pop"] = 1
+       param["dm-init-spin-af"] = True
+    else:
+       param["%block dm-init-spin"] = "\n1 + \n2 + \n3 - \n4 - \n%endblock dmintspin"
 
-    return kpoints_mesh
-
-
-def get_basis(element):
-    """
-    Basis set generator. Implement the exceptions due to problems with PseudoDojo pseudos.
-    """
-    basis_dict = {
-        'pao-energy-shift': '100 meV',  #default is 0.02 Ry = 272 meV
-        '%block pao-basis-sizes': "\n {} DZP\n%endblock pao-basis-sizes".format(element),
-    }
-
-    if element in ["Li", "Be", "Mg", "Na", "Ga", "Ge", "As", "Se", "In"]:
-        basis_dict['%block PAO-PolarizationScheme'] = "\n {} non-perturbative\n%endblock PaoPolarizationScheme".format(
-            element
-        )
-
-    return orm.Dict(dict=basis_dict)
-
-
-def get_parameters(element):
-    """
-    Parameters generator. Implements the choice of spin polarization according to the stndards
-    of the delta test.
-    """
-    parameters = {
-        'xc-functional': 'GGA',
-        'xc-authors': 'PBE',
-        'mesh-cutoff': "500 Ry",
-        'max-scf-iterations': 500,
-        'scf-mixer-history': 5,
-        'scf-mixer-weight': 0.1,
-        'scf-dm-tolerance': 1.e-5,
-        'electronic-temperature': '25 meV',  #294 K, 0.00183747 Ry
-        'write-forces': True,
-    }
-    if element in ["O", "Cr", "Mn", "Fe", "Co", "Ni"]:
-        parameters["spin"] = "polarized"
-        if element in ["Fe", "Co", "Ni"]:
-            parameters["dm-init-spin-af"] = False
-        elif element in ["Mn", "Cr"]:
-            parameters["write-mulliken-pop"] = 1
-            parameters["dm-init-spin-af"] = True
-        else:
-            parameters["%block dm-init-spin"] = "\n1 + \n2 + \n3 - \n4 - \n%endblock dmintspin"
-
-    return orm.Dict(dict=parameters)
+    return orm.Dict(dict=param)
 
 
 class DeltaWorkflow(WorkChain):
@@ -205,39 +172,28 @@ class DeltaWorkflow(WorkChain):
         spec.input("code", valid_type=orm.Code)
         spec.input('options', valid_type=orm.Dict)
 
-        spec.outline(cls.inpsetup, cls.run_eqs, cls.return_results)
+        spec.outline(cls.run_eqs, cls.return_results)
 
         spec.output('EosData', valid_type=orm.Dict, required=True)
         spec.output('DeltaValue', valid_type=orm.Float, required=True)
 
         spec.exit_code(301, 'EOS_FIT_FAIL', message='Problem in the fit of the EoS data')
 
-    def inpsetup(self):
-        structure = structure_init(self.inputs.element.value)
-        kpoints = kpgen(structure, 0.062)
-        parameters = get_parameters(self.inputs.element.value)
-        basis = get_basis(self.inputs.element.value)
-        pseudo_family = orm.Str("nc-sr-04_pbe_stringent_psml")
-        self.ctx.inputs = {
-            'code': self.inputs.code,
-            'structure': structure,
-            'pseudo_family': pseudo_family,
-            'parameters': parameters,
-            'basis': basis,
-            'kpoints': kpoints,
-            'options': self.inputs.options,
-            'metadata': {
-                'label': self.inputs.element.value
-            }
-        }
-
     def run_eqs(self):
+        element = self.inputs.element.value
+        structure = structure_init(element)
+        calc_eng = {'siesta': { 'code': self.inputs.code.label, 'options':self.inputs.options.get_dict() }}
+        inp_gen = EqOfStateFixedCellShape.inputs_generator()
+        filled_builder = inp_gen.get_filled_builder(structure, calc_eng, "standard_psml")
+        filled_builder.metadata["label"] = element
+        filled_builder.batch_size = orm.Int(7)
+        
+        if element in ["O", "Cr", "Mn", "Fe", "Co", "Ni"]:
+            param_new = fix_magnetic(element, filled_builder.parameters.get_dict())
+            filled_builder.parameters = param_new
 
-        inputs = self.ctx.inputs
-        #future = self.submit(SiestaBaseWorkChain, **inputs)
-        future = self.submit(EqOfStateFixedCellShape, **inputs)
-        el = self.inputs.element.value
-        self.report('Launching EqOfStateFixedCellShape,<{0}>, for element {1}'.format(future.pk, el))
+        future = self.submit(filled_builder)
+        self.report('Launching EqOfStateFixedCellShape,<{0}>, for element {1}'.format(future.pk, element))
 
         return ToContext(eos_calc=future)
 
