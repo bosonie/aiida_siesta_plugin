@@ -4,7 +4,7 @@ from aiida.orm import Float
 from aiida_siesta.calculations.tkdict import FDFDict
 from aiida_siesta.workflows.base import SiestaBaseWorkChain
 
-from .utils.iterate_absclass import BaseIterator
+from ..utils.iterate_absclass import BaseIterator
 
 
 @calcfunction
@@ -88,7 +88,7 @@ def rescale(structure, scale):
 
     the_ase = structure.get_ase()
     new_ase = the_ase.copy()
-    new_ase.set_cell(the_ase.get_cell() * float(scale), scale_atoms=True)
+    new_ase.set_cell(the_ase.get_cell() * pow(float(scale), 1 / 3), scale_atoms=True)
     new_structure = DataFactory('structure')(ase=new_ase)
 
     return new_structure
@@ -308,5 +308,5 @@ class EqOfStateFixedCellShape(BaseIterator):
 
     @classmethod
     def inputs_generator(cls):  # pylint: disable=no-self-argument,no-self-use
-        from aiida_siesta.workflows.utils.inputs_generators import EosWorkChainInputsGenerator
+        from aiida_siesta.utils.inputs_generators import EosWorkChainInputsGenerator
         return EosWorkChainInputsGenerator(cls)
