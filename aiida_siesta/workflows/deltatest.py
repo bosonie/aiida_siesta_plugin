@@ -8,16 +8,17 @@ def get_reference(element):
     """
     Extract the reference Vo B0 B1 from a file
     """
-    f = open('/home/ebosoni/DeltaTest/WIEN2k.txt', 'r')
-    for line in f:
-        a = line.split()
-        if a[0] == element:
-            vol = a[1]
-            b0 = a[2]  #In GPa
-            b1 = a[3]
-    return float(vol), float(b0), float(b1)
+    filen = open('/home/ebosoni/DeltaTest/WIEN2k.txt', 'r')
+    for line in filen:
+        split_line = line.split()
+        if split_line[0] == element:
+            vol = split_line[1]
+            b_0 = split_line[2]  #In GPa
+            b_1 = split_line[3]
+    return float(vol), float(b_0), float(b_1)
 
 
+#pylint: disable=invalid-name
 @calcfunction
 def calcDelta(v0wF, b0wF, b1wF, v0fF, b0fF, b1fF):
     """
@@ -146,19 +147,18 @@ def structure_init(element):
 #        )
 
 
-
 def fix_magnetic(element, param):
     """
     Add the specific spin options to parameters dict
     """
     param["spin"] = "polarized"
     if element in ["Fe", "Co", "Ni"]:
-       param["dm-init-spin-af"] = False
+        param["dm-init-spin-af"] = False
     elif element in ["Mn", "Cr"]:
-       param["write-mulliken-pop"] = 1
-       param["dm-init-spin-af"] = True
+        param["write-mulliken-pop"] = 1
+        param["dm-init-spin-af"] = True
     else:
-       param["%block dm-init-spin"] = "\n1 + \n2 + \n3 - \n4 - \n%endblock dmintspin"
+        param["%block dm-init-spin"] = "\n1 + \n2 + \n3 - \n4 - \n%endblock dmintspin"
 
     return orm.Dict(dict=param)
 
@@ -182,12 +182,12 @@ class DeltaWorkflow(WorkChain):
     def run_eqs(self):
         element = self.inputs.element.value
         structure = structure_init(element)
-        calc_eng = {'siesta': { 'code': self.inputs.code.label, 'options':self.inputs.options.get_dict() }}
+        calc_eng = {'siesta': {'code': self.inputs.code.label, 'options': self.inputs.options.get_dict()}}
         inp_gen = EqOfStateFixedCellShape.inputs_generator()
         filled_builder = inp_gen.get_filled_builder(structure, calc_eng, "standard_psml")
         filled_builder.metadata["label"] = element
         filled_builder.batch_size = orm.Int(7)
-        
+
         if element in ["O", "Cr", "Mn", "Fe", "Co", "Ni"]:
             param_new = fix_magnetic(element, filled_builder.parameters.get_dict())
             filled_builder.parameters = param_new
