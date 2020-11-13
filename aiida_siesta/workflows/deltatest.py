@@ -124,20 +124,21 @@ def structure_init(element):
     :param element: The element to create the structure with.
     :return: The structure and the kpoint mesh (from file, releted to the structure!).
     """
-    import pymatgen as mg
+    import ase.io
 
     f = open('/home/ebosoni/DeltaTest/WIEN2k.txt', 'r')
     for line in f:
         a = line.split()
         if a[0] == element:
-            vol = a[1]
+            vol_per_atom = a[1]
 
-    in_structure = mg.Structure.from_file("/home/ebosoni/DeltaTest/CIFs/{0}.cif".format(element), primitive=False)
-    newreduced = in_structure.copy()
-    newreduced.scale_lattice(float(vol) * in_structure.num_sites)
-    structure = orm.StructureData(pymatgen_structure=newreduced)
+    in_structure = ase.io.read("/home/ebosoni/DeltaTest/CIFs/{0}.cif".format(element))
+    new = in_structure.copy()
+    vol_ratio = float(vol_per_atom) * len(in_structure) / in_structure.get_volume()
+    new.set_cell(in_structure.get_cell() * pow(vol_ratio, 1 / 3), scale_atoms=True)
+    structure_new = orm.StructureData(ase=new)
 
-    return structure
+    return structure_new
 
 
 #
